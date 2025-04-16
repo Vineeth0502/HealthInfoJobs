@@ -32,6 +32,8 @@ import {
   Line,
   Area,
 } from "recharts";
+import { useCSVData } from "../job-seeker/useCSVData";
+import { useMemo,useEffect} from "react";
 import { Loader2, Download, BookmarkPlus } from "lucide-react";
 
 const SalaryExplorer: React.FC = () => {
@@ -40,10 +42,38 @@ const SalaryExplorer: React.FC = () => {
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [salaryRange, setSalaryRange] = useState<number[]>([60000, 150000]);
   const [experienceLevel, setExperienceLevel] = useState<string>("all");
-
+  const { data: csvData, loading: csvLoading } = useCSVData();
+  useEffect(() => {
+    if (!csvLoading && csvData.length > 0) {
+      console.log("✅ Loaded CSV data:", csvData.slice(0, 5));
+    }
+  }, [csvData, csvLoading]);
   const { data: jobRoles, isLoading: jobRolesLoading } = useQuery({
     queryKey: ["/api/jobs"],
   });
+
+  const filteredData = useMemo(() => {
+    if (!csvData || csvData.length === 0) return [];
+  
+    return csvData.filter((job) => {
+      const salary = parseFloat(String(job["Average Salary ($)"]));
+      const matchesRole =
+        selectedJobRole === "all" ||
+        job["Job Title"]?.toLowerCase().includes(selectedJobRole.toLowerCase());
+  
+      const matchesRegion =
+        selectedRegion === "all" || job["Region"] === selectedRegion;
+  
+      const matchesExperience =
+        experienceLevel === "all" ||
+        job["Experience Level"]?.toLowerCase().includes(experienceLevel);
+  
+      const matchesSalaryRange =
+        salary >= salaryRange[0] && salary <= salaryRange[1];
+  
+      return matchesRole && matchesRegion && matchesExperience && matchesSalaryRange;
+    });
+  }, [csvData, selectedJobRole, selectedRegion, experienceLevel, salaryRange]);
 
   const handleSaveInsight = () => {
     toast({
@@ -58,22 +88,57 @@ const SalaryExplorer: React.FC = () => {
       description: "Salary data has been exported to CSV",
     });
   };
+  const experienceLevelData = useMemo(() => {
+    const grouped: Record<string, number[]> = {
+      "Entry Level": [],
+      "Mid Level": [],
+      "Senior Level": [],
+    };
+  
+    filteredData.forEach((job) => {
+      const level = job["Experience Level"]?.trim();
+      const salary = parseFloat(job["Average Salary ($)"]?.toString().replace(/[^0-9.]/g, ""));
+  
+      if (!level || isNaN(salary)) return;
+  
+      if (grouped[level]) {
+        grouped[level].push(salary);
+      }
+    });
+    console.log("📊 Experience Salary Debug:");
+Object.entries(grouped).forEach(([level, salaries]) => {
+  const min = Math.min(...salaries);
+  const max = Math.max(...salaries);
+  const avg = salaries.reduce((a, b) => a + b, 0) / salaries.length;
+  console.log(`${level}: count=${salaries.length}, avg=$${avg.toFixed(2)}, min=$${min}, max=$${max}`);
+});
+  
+    return Object.entries(grouped).map(([level, salaries]) => ({
+      level,
+      salary: salaries.length
+        ? Math.round(salaries.reduce((a, b) => a + b, 0) / salaries.length)
+        : 0,
+    }));
+  }, [filteredData]);
 
-  const experienceLevelData = [
-    { level: "Entry Level (0-2 yrs)", salary: 65000 },
-    { level: "Mid Level (3-5 yrs)", salary: 85000 },
-    { level: "Senior (6-9 yrs)", salary: 110000 },
-    { level: "Expert (10+ yrs)", salary: 135000 },
-  ];
+  const salaryTrendData = useMemo(() => {
+  const grouped: Record<number, number[]> = {};
 
-  const salaryTrendData = [
-    { year: 2018, salary: 72000 },
-    { year: 2019, salary: 75500 },
-    { year: 2020, salary: 79000 },
-    { year: 2021, salary: 82500 },
-    { year: 2022, salary: 87250 },
-    { year: 2023, salary: 92000 },
-  ];
+  filteredData.forEach((job) => {
+    const year = parseInt(String(job["Year"]));
+    const salary = parseFloat(String(job["Average Salary ($)"]));
+    if (!year || isNaN(salary)) return;
+    if (!grouped[year]) grouped[year] = [];
+    grouped[year].push(salary);
+  });
+
+  return Object.entries(grouped)
+    .map(([year, salaries]) => ({
+      year: parseInt(year),
+      salary: Math.round(salaries.reduce((a, b) => a + b, 0) / salaries.length),
+    }))
+    .sort((a, b) => a.year - b.year);
+}, [filteredData]);
 
   const formatSalary = (value: number) => `$${value.toLocaleString()}`;
 

@@ -42,6 +42,23 @@ const LocationInsights: React.FC = () => {
   const { toast } = useToast();
   const [selectedJobRole, setSelectedJobRole] = useState<string>('all');
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
+  const [selectedSpecialty, setSelectedSpecialty] = useState("all_specialties");
+  const specialtyKeywords: Record<string, string[]> = {
+    "Data & Analytics": ["data", "analytics", "scientist", "engineer"],
+    "Clinical Informatics": ["clinical", "ehr", "medical", "applications"],
+    "Health IT Management": ["manager", "project", "consultant"],
+    "Public & Population Health": ["population", "public"],
+    "Coding & Terminology": ["coder", "terminology"],
+    "Telehealth & Remote Care": ["telehealth"]
+  };
+
+  const matchesSpecialty = (job: Record<string, any>) =>
+    selectedSpecialty === "all_specialties" ||
+    (specialtyKeywords[selectedSpecialty] || []).some((keyword) =>
+      job["Job Title"]?.toLowerCase().includes(keyword)
+    );
+
+
    const { data: csvData, loading: csvLoading } = useCSVData();
     useEffect(() => {
       if (!csvLoading && csvData.length > 0) {
@@ -52,6 +69,25 @@ const LocationInsights: React.FC = () => {
   const { data: jobRoles, isLoading: jobRolesLoading } = useQuery({
     queryKey: ['/api/jobs'],
   });
+
+  const filteredData = useMemo(() => {
+    if (!csvData || csvData.length === 0) return [];
+  
+    return csvData.filter((job) => {
+      const title = job["Job Title"]?.toLowerCase() || "";
+  
+      const matchesSpecialty =
+        selectedSpecialty === "all_specialties" ||
+        (specialtyKeywords[selectedSpecialty] || []).some((kw) =>
+          title.includes(kw)
+        );
+  
+        const matchesRegion =
+      selectedRegion === "all" ||
+      (regions[selectedRegion]?.includes(job.State))
+      return matchesSpecialty && matchesRegion;
+    });
+  }, [csvData, selectedSpecialty,selectedRegion]);
   
   // Fetch location data for selected job role
   const { data: locationData, isLoading: locationDataLoading } = useQuery<SalaryByLocation[]>({
@@ -87,9 +123,9 @@ const LocationInsights: React.FC = () => {
   
   // Filter location data based on selected filters
   const filteredLocationData = useMemo(() => {
-    if (!csvData || csvData.length === 0) return [];
+    if (!filteredData || filteredData.length === 0) return [];
   
-    return csvData.filter((job) => {
+    return filteredData.filter((job) => {
       const matchesJob =
         selectedJobRole === 'all' ||
         job['Job Title']?.toLowerCase().includes(selectedJobRole.toLowerCase());
@@ -103,9 +139,9 @@ const LocationInsights: React.FC = () => {
   
   
   const jobDistributionData = useMemo(() => {
-    if (!csvData || csvData.length === 0) return [];
+    if (!filteredData || filteredData.length === 0) return [];
   
-    const grouped = csvData.reduce((acc, row) => {
+    const grouped = filteredData.reduce((acc, row) => {
       const state = row.State?.trim();
       if (!state) return acc;
       acc[state] = (acc[state] || 0) + 1;
@@ -122,14 +158,14 @@ const LocationInsights: React.FC = () => {
         percentage: Math.round((jobCount / totalJobs) * 100),
       }))
       .sort((a, b) => b.jobCount - a.jobCount);
-  }, [csvData]);
+  }, [filteredData]);
   
   
   // Prepare data for regional distribution pie chart
   const regionalDistributionData = useMemo(() => {
-    if (!csvData || csvData.length === 0) return [];
+    if (!filteredData || filteredData.length === 0) return [];
   
-    const grouped = csvData.reduce((acc, row) => {
+    const grouped = filteredData.reduce((acc, row) => {
       const region = row.Region?.trim();
       if (!region) return acc;
       acc[region] = (acc[region] || 0) + 1;
@@ -145,15 +181,15 @@ const LocationInsights: React.FC = () => {
         percentage: Math.round((jobCount / totalJobs) * 100),
       }))
       .sort((a, b) => b.jobCount - a.jobCount);
-  }, [csvData]);
+  }, [filteredData]);
   
   const workArrangementData = useMemo(() => {
-    if (!csvData || csvData.length === 0) return [];
+    if (!filteredData || filteredData.length === 0) return [];
   
     let remote = 0;
     let onsite = 0;
   
-    csvData.forEach((job) => {
+    filteredData.forEach((job) => {
       const value = job["Remote Work"]?.toLowerCase();
       if (value === "yes") remote += 1;
       else onsite += 1;
@@ -165,13 +201,13 @@ const LocationInsights: React.FC = () => {
       { name: "Remote", value: Math.round((remote / total) * 100) },
       { name: "On-site", value: Math.round((onsite / total) * 100) },
     ];
-  }, [csvData]);
+  }, [filteredData]);
 
   const topCities = useMemo(() => {
-    if (!csvData || csvData.length === 0) return [];
+    if (!filteredData || filteredData.length === 0) return [];
   
     const counts: Record<string, number> = {};
-    csvData.forEach((job) => {
+    filteredData.forEach((job) => {
       const city = job["City"]?.trim();
       const state = job["State"]?.trim();
       if (!city || !state) return;
@@ -183,14 +219,14 @@ const LocationInsights: React.FC = () => {
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 6); // top 6 cities
-  }, [csvData]);
+  }, [filteredData]);
 
   const remoteTrends = useMemo(() => {
-    if (!csvData || csvData.length === 0) return [];
+    if (!filteredData || filteredData.length === 0) return [];
   
     const grouped: Record<string, { total: number; remote: number }> = {};
   
-    csvData.forEach((job) => {
+    filteredData.forEach((job) => {
       const year = String(job["Year"])?.trim();
       const remote = job["Remote Work"]?.toLowerCase() === "yes";
       if (!year) return;
@@ -276,22 +312,20 @@ const LocationInsights: React.FC = () => {
                         <label className="text-sm font-medium text-gray-700 block mb-1">
                           Job Role
                         </label>
-                        <Select
-                          value={selectedJobRole}
-                          onValueChange={setSelectedJobRole}
-                        >
-                          <SelectTrigger className="w-full md:w-[250px]">
-                            <SelectValue placeholder="Select a job role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Health Informatics Roles</SelectItem>
-                            {jobRoles?.map(role => (
-                              <SelectItem key={role.id} value={role.id.toString()}>
-                                {role.title}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
+  <SelectTrigger className="w-full md:w-[250px]">
+    <SelectValue placeholder="Select a specialty" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all_specialties">All Specialties</SelectItem>
+    <SelectItem value="Data & Analytics">Data & Analytics</SelectItem>
+    <SelectItem value="Clinical Informatics">Clinical Informatics</SelectItem>
+    <SelectItem value="Health IT Management">Health IT Management</SelectItem>
+    <SelectItem value="Public & Population Health">Public & Population Health</SelectItem>
+    <SelectItem value="Coding & Terminology">Coding & Terminology</SelectItem>
+    <SelectItem value="Telehealth & Remote Care">Telehealth & Remote Care</SelectItem>
+  </SelectContent>
+</Select>
                       </div>
                       
                       <div className="flex-grow">

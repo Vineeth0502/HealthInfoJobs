@@ -4,7 +4,7 @@ import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
 import CardMetric from "@/components/ui/card-metric";
 import SalaryChart from "@/components/charts/salary-chart";
-import SkillsChart from "@/components/charts/skills-chart";
+import TopSkillsSection from "@/components/job-seeker/TopSkillsSection";
 import JobDistributionMap from "@/components/charts/job-distribution-map";
 import TopSkillsChart from "@/components/charts/top-skills-chart";
 import RegionalSalaryChart from "@/components/charts/regional-salary-chart";
@@ -676,7 +676,7 @@ const JobSeekerDashboard: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                {!csvLoading && top5SalaryJobs.length > 0 && (
+                {/* {!csvLoading && top5SalaryJobs.length > 0 && (
                   <div className="bg-white border rounded-md shadow p-4 mb-6">
                     <h2 className="text-lg font-semibold text-gray-800 mb-2">
                       Top 5 Highest Paying Jobs (From CSV)
@@ -689,7 +689,7 @@ const JobSeekerDashboard: React.FC = () => {
                       ))}
                     </ul>
                   </div>
-                )}
+                )} */}
                 {/* Main content - tabs for different views */}
                 <Tabs defaultValue="overview" className="space-y-6">
                   <TabsList className="grid grid-cols-2 w-full md:w-auto">
@@ -709,10 +709,18 @@ const JobSeekerDashboard: React.FC = () => {
                       />
 
                       {/* In-Demand Skills */}
-                      <SkillsChart
-                        skills={skillsData}
-                        title="Top In-Demand Skills"
-                      />
+                      <Card>
+  <CardHeader>
+    <CardTitle>Top In-Demand Skills</CardTitle>
+    <CardDescription>
+      Breakdown of current top technical and soft skills
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    <TopSkillsSection skills={skillsData} />
+  </CardContent>
+</Card>
+
                     </div>
 
                     {/* Geographic Job Distribution Map */}

@@ -38,10 +38,10 @@ import { Loader2, Download, BookmarkPlus } from "lucide-react";
 
 const SalaryExplorer: React.FC = () => {
   const { toast } = useToast();
-  const [selectedJobRole, setSelectedJobRole] = useState<string>("all");
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [salaryRange, setSalaryRange] = useState<number[]>([60000, 150000]);
   const [experienceLevel, setExperienceLevel] = useState<string>("all");
+  const [selectedSpecialty, setSelectedSpecialty] = useState("all_specialties");
   const { data: csvData, loading: csvLoading } = useCSVData();
   useEffect(() => {
     if (!csvLoading && csvData.length > 0) {
@@ -52,29 +52,51 @@ const SalaryExplorer: React.FC = () => {
     queryKey: ["/api/jobs"],
   });
 
-  const filteredData = useMemo(() => {
+  const specialtyKeywords: Record<string, string[]> = {
+    "Data & Analytics": ["data", "analytics", "scientist", "engineer"],
+    "Clinical Informatics": ["clinical", "ehr", "medical", "applications"],
+    "Health IT Management": ["manager", "project", "consultant"],
+    "Public & Population Health": ["population", "public"],
+    "Coding & Terminology": ["coder", "terminology"],
+    "Telehealth & Remote Care": ["telehealth"],
+  };
+  const regions = useMemo(() => {
     if (!csvData || csvData.length === 0) return [];
-  
-    return csvData.filter((job) => {
-      const salary = parseFloat(String(job["Average Salary ($)"]));
-      const matchesRole =
-        selectedJobRole === "all" ||
-        job["Job Title"]?.toLowerCase().includes(selectedJobRole.toLowerCase());
-  
-      const matchesRegion =
-        selectedRegion === "all" || job["Region"] === selectedRegion;
-  
-      const matchesExperience =
-        experienceLevel === "all" ||
-        job["Experience Level"]?.toLowerCase().includes(experienceLevel);
-  
-      const matchesSalaryRange =
-        salary >= salaryRange[0] && salary <= salaryRange[1];
-  
-      return matchesRole && matchesRegion && matchesExperience && matchesSalaryRange;
+    const unique = new Set<string>();
+    csvData.forEach((job) => {
+      const region = job["Region"]?.trim();
+      if (region) unique.add(region);
     });
-  }, [csvData, selectedJobRole, selectedRegion, experienceLevel, salaryRange]);
+    return Array.from(unique).sort();
+  }, [csvData]);
 
+
+    const filteredData = useMemo(() => {
+      if (!csvData || csvData.length === 0) return [];
+    
+      return csvData.filter((job) => {
+        const salary = parseFloat(String(job["Average Salary ($)"]));
+        const matchesSpecialty =
+          selectedSpecialty === "all_specialties" ||
+          (specialtyKeywords[selectedSpecialty] || []).some((kw) =>
+            job["Job Title"]?.toLowerCase().includes(kw)
+          );
+    
+        const matchesRegion =
+          selectedRegion === "all" || job["Region"] === selectedRegion;
+    
+        const matchesExperience =
+          experienceLevel === "all" ||
+          job["Experience Level"] === experienceLevel;
+    
+        const matchesSalaryRange =
+          !isNaN(salary) &&
+          salary >= salaryRange[0] &&
+          salary <= salaryRange[1];
+    
+        return matchesSpecialty && matchesRegion && matchesExperience && matchesSalaryRange;
+      });
+    }, [csvData, selectedSpecialty, selectedRegion, experienceLevel, salaryRange]);
   const handleSaveInsight = () => {
     toast({
       title: "Insight Saved",
@@ -211,27 +233,20 @@ Object.entries(grouped).forEach(([level, salaries]) => {
                         <label className="text-sm font-medium text-gray-700 block mb-1">
                           Job Role
                         </label>
-                        <Select
-                          value={selectedJobRole}
-                          onValueChange={setSelectedJobRole}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a job role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">
-                              All Health Informatics Roles
-                            </SelectItem>
-                            {jobRoles?.map((role) => (
-                              <SelectItem
-                                key={role.id}
-                                value={role.id.toString()}
-                              >
-                                {role.title}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
+                        <SelectTrigger className="w-full md:w-[300px]">
+                          <SelectValue placeholder="Select a specialty" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all_specialties">All Specialties</SelectItem>
+                          <SelectItem value="Data & Analytics">Data & Analytics</SelectItem>
+                          <SelectItem value="Clinical Informatics">Clinical Informatics</SelectItem>
+                          <SelectItem value="Health IT Management">Health IT Management</SelectItem>
+                          <SelectItem value="Public & Population Health">Public & Population Health</SelectItem>
+                          <SelectItem value="Coding & Terminology">Coding & Terminology</SelectItem>
+                          <SelectItem value="Telehealth & Remote Care">Telehealth & Remote Care</SelectItem>
+                        </SelectContent>
+                      </Select>
                       </div>
 
                       <div>
@@ -246,14 +261,19 @@ Object.entries(grouped).forEach(([level, salaries]) => {
                             <SelectValue placeholder="Select a region" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">
-                              National Average
-                            </SelectItem>
+                          <SelectContent>
+  <SelectItem value="all">All Regions</SelectItem>
+  {regions.map((region) => (
+    <SelectItem key={region} value={region}>
+      {region}
+    </SelectItem>
+  ))}
+</SelectContent>
                           </SelectContent>
                         </Select>
                       </div>
 
-                      <div>
+                      {/* <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">
                           Experience Level
                         </label>
@@ -282,9 +302,9 @@ Object.entries(grouped).forEach(([level, salaries]) => {
                             </SelectItem>
                           </SelectContent>
                         </Select>
-                      </div>
+                      </div> */}
 
-                      <div>
+                      {/* <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">
                           Salary Range: ${salaryRange[0].toLocaleString()} - $
                           {salaryRange[1].toLocaleString()}
@@ -297,13 +317,13 @@ Object.entries(grouped).forEach(([level, salaries]) => {
                           onValueChange={setSalaryRange}
                           className="mt-4"
                         />
-                      </div>
+                      </div> */}
                     </div>
                     <div className="mt-6 flex justify-end">
                       <Button
                         variant="secondary"
                         onClick={() => {
-                          setSelectedJobRole("all");
+                          setSelectedSpecialty("all_specialties");
                           setSelectedRegion("all");
                           setExperienceLevel("all");
                           setSalaryRange([60000, 150000]);

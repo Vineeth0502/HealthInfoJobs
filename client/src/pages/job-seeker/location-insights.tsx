@@ -380,16 +380,16 @@ const LocationInsights: React.FC = () => {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="stateCode" />
                           <YAxis />
-                          <Tooltip 
-                            formatter={(value, name) => [value, name === 'jobCount' ? 'Job Count' : 'Percentage']}
-                            labelFormatter={(label, payload) => {
-                              if (payload && payload.length > 0) {
-                                const data = payload[0].payload;
-                                return `State: ${data.state}`;
-                              }
-                              return label;
-                            }}
-                          />
+                          <Tooltip
+  formatter={(value) => [`${value.toLocaleString()} jobs`, 'Job Count']}
+  labelFormatter={(label, payload) => {
+    if (payload?.[0]?.payload) {
+      return `State: ${payload[0].payload.state}`;
+    }
+    return label;
+  }}
+/>
+
                           <Legend />
                           <Bar dataKey="jobCount" name="Job Count" fill="#3b82f6" />
                         </BarChart>
@@ -491,16 +491,16 @@ const LocationInsights: React.FC = () => {
                     </CardHeader>
                     <CardContent>
                     <div className="space-y-4">
-  {topCities.map((city, index) => (
-    <div key={city.name} className="flex justify-between items-center">
-      <div className="flex items-center gap-2">
-        <div className="h-3 w-3 rounded-full bg-blue-600"></div>
-        <span>{city.name}</span>
-      </div>
-      <div className="text-sm font-medium">{city.count.toLocaleString()} jobs</div>
-    </div>
-  ))}
-</div>
+                    {topCities.map((city, index) => (
+                      <div key={city.name} className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-blue-600"></div>
+                          <span>{city.name}</span>
+                        </div>
+                        <div className="text-sm font-medium">{city.count.toLocaleString()} jobs</div>
+                      </div>
+                    ))}
+                  </div>
                     </CardContent>
                   </Card>
                   

@@ -104,6 +104,44 @@ const SalaryExplorer: React.FC = () => {
     });
   };
 
+  const roleSalaryStats = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
+  
+    const roleMap: Record<string, { max: number; min: number; count: number }> = {};
+  
+    filteredData.forEach((job) => {
+      const title = job["Job Title"]?.trim();
+      const salary = parseFloat(job["Average Salary ($)"]?.toString().replace(/[^0-9.]/g, ""));
+      if (!title || isNaN(salary)) return;
+  
+      if (!roleMap[title]) {
+        roleMap[title] = { max: salary, min: salary, count: 1 };
+      } else {
+        roleMap[title].max = Math.max(roleMap[title].max, salary);
+        roleMap[title].min = Math.min(roleMap[title].min, salary);
+        roleMap[title].count += 1;
+      }
+    });
+  
+    const topRoles = Object.entries(roleMap)
+      .map(([role, { max, min, count }]) => ({
+        role: role.length > 25 ? `${role.slice(0, 25)}...` : role,
+        maxSalary: Math.round(max),
+        minSalary: Math.round(min),
+        count,
+      }))
+      .sort((a, b) => b.maxSalary - a.maxSalary)
+      .slice(0, 10);
+  
+    const topSalary = topRoles[0]?.maxSalary || 1;
+  
+    return topRoles.map((entry) => ({
+      ...entry,
+      difference: Math.round(((topSalary - entry.maxSalary) / topSalary) * 100),
+    }));
+  }, [filteredData]);
+  
+  
   const handleExportData = () => {
     toast({
       title: "Data Exported",
@@ -262,13 +300,13 @@ Object.entries(grouped).forEach(([level, salaries]) => {
                           </SelectTrigger>
                           <SelectContent>
                           <SelectContent>
-  <SelectItem value="all">All Regions</SelectItem>
-  {regions.map((region) => (
-    <SelectItem key={region} value={region}>
-      {region}
-    </SelectItem>
-  ))}
-</SelectContent>
+                              <SelectItem value="all">All Regions</SelectItem>
+                              {regions.map((region) => (
+                                <SelectItem key={region} value={region}>
+                                  {region}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
                           </SelectContent>
                         </Select>
                       </div>
@@ -370,11 +408,104 @@ Object.entries(grouped).forEach(([level, salaries]) => {
                     </div>
                   </CardContent>
                 </Card>
+                {/* Highest Salary by Role */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top Job Roles: Salary Ranges & Demand</CardTitle>
+                    <CardDescription>
+                      Compare highest and lowest salaries per role, along with job demand
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[500px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart
+                          data={roleSalaryStats}
+                          margin={{ top: 30, right: 40, left: 20, bottom: 100 }}
+                          barGap={4}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="role"
+                            angle={-45}
+                            interval={0}
+                            textAnchor="end"
+                            height={120}
+                            tick={{ fontSize: 11 }}
+                            label={{ value: "Job Role", position: "insideBottom", offset: -60 }}
+                          />
+                          <YAxis
+                            yAxisId="left"
+                            tickFormatter={(val) => `$${val.toLocaleString()}`}
+                            width={80}
+                            label={{
+                              value: "Salary ($)",
+                              angle: -90,
+                              position: "insideLeft",
+                              offset: -10,
+                            }}
+                          />
+                          <YAxis
+                            yAxisId="right"
+                            orientation="right"
+                            width={60}
+                            label={{
+                              value: "Job Count",
+                              angle: 90,
+                              position: "insideRight",
+                              offset: 10,
+                            }}
+                          />
+                          <Tooltip
+                            wrapperStyle={{ fontSize: '0.85rem' }}
+                            formatter={(value, name, props) => {
+                              const diff = props?.payload?.[0]?.payload?.difference ?? 0;
+                              if (name === "Highest Salary") {
+                                return [
+                                  `$${(value as number).toLocaleString()}`,
+                                  "Highest Salary",
+                                ];
+                              } else if (name === "Lowest Salary") {
+                                return [`$${(value as number).toLocaleString()}`, "Lowest Salary"];
+                              } else {
+                                return [`${value}`, "Job Count"];
+                              }
+                            }}
+                          />
+                          <Legend verticalAlign="top" height={36} />
+                          <Bar
+                            yAxisId="left"
+                            dataKey="maxSalary"
+                            name="Highest Salary"
+                            fill="#6366f1"
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Bar
+                            yAxisId="left"
+                            dataKey="minSalary"
+                            name="Lowest Salary"
+                            fill="#10b981"
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Line
+                            yAxisId="right"
+                            dataKey="count"
+                            stroke="#fbbf24"
+                            name="Job Count"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            activeDot={{ r: 6 }}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Salary Trends */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Salary Trends (2018-2023)</CardTitle>
+                    <CardTitle>Salary Trends (2016-2025)</CardTitle>
                     <CardDescription>
                       Historical salary trends for health informatics
                       professionals
